@@ -297,6 +297,22 @@ configure_gunicorn() {
     SEAHUB_PORT
 }
 
+configure_smtp() {
+  if [[ -n ${SMTP_HOST} ]]; then
+    echo "Configuring SMTP..."
+    update_template ${SEAHUB_CONFIG} \
+      SMTP_USER \
+      SMTP_PASS \
+      SMTP_HOST \
+      SMTP_PORT \
+      SMTP_TLS \
+      SEAFILE_EMAIL \
+      SEAFILE_EMAIL_DISPLAY_NAME
+  else
+    sed -i "/EMAIL_USE_TLS/,/SERVER_EMAIL/d" ${SEAHUB_CONFIG}
+  fi
+}
+    
 initialize() {
   echo "Initializing seafile..."
   initialize_datadir
@@ -314,4 +330,5 @@ configure() {
   configure_seafile
   configure_seahub
   configure_gunicorn
+  configure_smtp
 }
