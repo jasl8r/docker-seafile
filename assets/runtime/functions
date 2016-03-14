@@ -266,7 +266,8 @@ configure_ccnet() {
   update_template ${CCNET_CONFIG} \
     SEAFILE_NAME \
     CCNET_PEER_ID \
-    SEAFILE_HOST
+    SEAFILE_HOST \
+    SEAHUB_PORT
 }
 
 configure_seafdav() {
