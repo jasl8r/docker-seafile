@@ -72,7 +72,7 @@ initialize_datadir() {
   
   # create the seahub data directory
   mkdir -p "${SEAHUB_DATA_DIR}"
-  ln -s ${SEAHUB_DATA_DIR} "${SEAFILE_HOME}/seahub-data"
+  ln -sf ${SEAHUB_DATA_DIR} "${SEAFILE_HOME}/seahub-data"
   chmod 700 ${SEAHUB_DATA_DIR}
 }
 
