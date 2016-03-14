@@ -165,9 +165,9 @@ finalize_database_parameters() {
 
   # set default user and database
   DB_USER=${DB_USER:-root}
-  DB_NAME=${CCNET_DB_NAME:-ccnet-db}
-  DB_NAME=${SEAFILE_DB_NAME:-seafile-db}
-  DB_NAME=${SEAHUB_DB_NAME:-seahub-db}
+  CCNET_DB_NAME=${CCNET_DB_NAME:-ccnet-db}
+  SEAFILE_DB_NAME=${SEAFILE_DB_NAME:-seafile-db}
+  SEAHUB_DB_NAME=${SEAHUB_DB_NAME:-seahub-db}
 }
 
 check_database_connection() {
