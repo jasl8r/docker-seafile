@@ -1,0 +1,20 @@
+mysql:
+  image: mysql:latest
+  environment:
+    - MYSQL_USER=seafile
+    - MYSQL_PASSWORD=password
+    - MYSQL_DATABASE=seafile
+    - MYSQL_ROOT_PASSWORD=password
+
+seafile:
+  build: .
+  links:
+    - mysql:mysql
+  ports:
+    - "8000:8000"
+    - "8082:8082"
+  environment:
+    - SEAFILE_HOST=www.example.com
+    - SEAFILE_ADMIN_EMAIL=admin@example.com
+    - SEAFILE_ADMIN_PASS=password
+    - SEAHUB_SECRET_KEY=long-and-random-alphanumeric-string

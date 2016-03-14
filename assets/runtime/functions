@@ -1,0 +1,316 @@
+#!/bin/bash
+set -e
+set -x
+source ${SEAFILE_RUNTIME_DIR}/env-defaults
+
+SYSCONF_TEMPLATES_DIR="${SEAFILE_RUNTIME_DIR}/config"
+
+CCNET_CONFIG="${SEAFILE_CONF_DIR}/ccnet.conf"
+SEAFDAV_CONFIG="${SEAFILE_CONF_DIR}/seafdav.conf"
+SEAFILE_CONFIG="${SEAFILE_CONF_DIR}/seafile.conf"
+SEAHUB_CONFIG="${SEAFILE_CONF_DIR}/seahub_settings.py"
+GUNICORN_CONFIG="${SEAFILE_CONF_DIR}/gunicorn.conf"
+SEAHUB_SQL="${SEAFILE_INSTALL_DIR}/seahub/sql/mysql.sql"
+CCNET_SQL="${SEAFILE_RUNTIME_DIR}/sql/ccnet.sql"
+CCNET_KEY_FILE="${CCNET_DATA_DIR}/mykey.peer"
+
+## Copies configuration template to the destination as the specified USER
+### Looks up for overrides in ${USERCONF_TEMPLATES_DIR} before using the defaults from ${SYSCONF_TEMPLATES_DIR}
+# $1: copy-as user
+# $2: source file
+# $3: destination location
+# $4: mode of destination
+install_template() {
+  local OWNERSHIP=${1}
+  local SRC=${2}
+  local DEST=${3}
+  local MODE=${4:-0644}
+  if [[ -f ${SYSCONF_TEMPLATES_DIR}/${SRC} ]]; then
+    cp ${SYSCONF_TEMPLATES_DIR}/${SRC} ${DEST}
+  fi
+  chmod ${MODE} ${DEST}
+  chown ${OWNERSHIP} ${DEST}
+}
+
+## Replace placeholders with values
+# $1: file with placeholders to replace
+# $x: placeholders to replace
+update_template() {
+  local FILE=${1?missing argument}
+  shift
+
+  [[ ! -f ${FILE} ]] && return 1
+
+  local VARIABLES=($@)
+  local USR=$(stat -c %U ${FILE})
+  local tmp_file=$(mktemp)
+  cp -a "${FILE}" ${tmp_file}
+
+  local variable
+  for variable in ${VARIABLES[@]}; do
+    # Keep the compatibilty: {{VAR}} => ${VAR}
+    sed -ri "s/[{]{2}$variable[}]{2}/\${$variable}/g" ${tmp_file}
+  done
+
+  # Replace placeholders
+  (
+    export ${VARIABLES[@]}
+    local IFS=":"; sudo -HEu ${USR} envsubst "${VARIABLES[*]/#/$}" < ${tmp_file} > ${FILE}
+  )
+  rm -f ${tmp_file}
+}
+
+initialize_datadir() {
+  echo "Initializing datadir..."
+  chmod 755 ${SEAFILE_ROOT_DATA_DIR}
+  
+  # create the ccnet directory
+  mkdir -p ${CCNET_DATA_DIR}
+  
+  # create the seafile data directory
+  mkdir -p ${SEAFILE_DATA_DIR}
+  
+  # create the seahub data directory
+  mkdir -p "${SEAHUB_DATA_DIR}"
+  ln -s ${SEAHUB_DATA_DIR} "${SEAFILE_HOME}/seahub-data"
+  chmod 700 ${SEAHUB_DATA_DIR}
+}
+
+initialize_logdir() {
+  echo "Initializing logdir..."
+  mkdir -p ${SEAFILE_LOG_DIR}/supervisor
+  chmod -R 0755 ${SEAFILE_LOG_DIR}/supervisor
+  chown -R root: ${SEAFILE_LOG_DIR}/supervisor
+}
+
+initialize_ccnet() {
+  if [[ ! -f ${CCNET_KEY_FILE} ]]
+  then
+    openssl genpkey -algorithm rsa -pkeyopt rsa_keygen_bits:2048 -pkeyopt rsa_keygen_pubexp:35 > ${CCNET_KEY_FILE}
+  fi
+  
+  MODULUS=$(openssl rsa -in ${CCNET_KEY_FILE} -noout -modulus | cut -d '=' -f 2)
+  CCNET_PEER_ID=$(python ${SEAFILE_RUNTIME_DIR}/generateid.py ${MODULUS} 35)
+}
+
+initialize_seahub() {
+  # Copy the doc templates
+  DOCS_DIR="${SEAFILE_INSTALL_DIR}/seafile/docs"
+  TEMPLATE_DIR="${SEAFILE_DATA_DIR}/library-template"
+  if [[ ! -d ${TEMPLATE_DIR} ]]
+  then
+    mkdir -p ${TEMPLATE_DIR}
+    cp -f ${DOCS_DIR}/*.doc ${TEMPLATE_DIR}
+  fi
+
+  # Setup avatars
+  MEDIA_DIR="${SEAFILE_INSTALL_DIR}/seahub/media"
+  SRC_AVATAR_DIR="${SEAFILE_INSTALL_DIR}/seahub/media/avatars"
+  DST_AVATAR_DIR="${SEAHUB_DATA_DIR}/avatars"
+  if [[ ! -d ${DST_AVATAR_DIR} ]]; then
+    mv "${SRC_AVATAR_DIR}" "${DST_AVATAR_DIR}"
+    ln -s ${SEAHUB_DATA_DIR}/avatars ${MEDIA_DIR}
+  fi
+}
+
+install_configuration_templates() {
+  echo "Installing configuration templates..."
+  
+  mkdir -p ${SEAFILE_CONF_DIR}
+  
+  install_template root: ccnet.conf ${CCNET_CONFIG} 0640
+  install_template root: seafdav.conf ${SEAFDAV_CONFIG} 0640
+  install_template root: seafile.conf ${SEAFILE_CONFIG} 0640
+  install_template root: seahub_settings.py ${SEAHUB_CONFIG} 0640
+  install_template root: gunicorn.conf ${GUNICORN_CONFIG} 0640
+}
+
+finalize_database_parameters() {
+  # is a mysql database linked?
+  # requires that the mysql container has exposed port 3306.
+  if [[ -n ${MYSQL_PORT_3306_TCP_ADDR} ]]; then
+    DB_ADAPTER=${DB_ADAPTER:-mysql}
+    DB_HOST=${DB_HOST:-${MYSQL_PORT_3306_TCP_ADDR}}
+    DB_PORT=${DB_PORT:-${MYSQL_PORT_3306_TCP_PORT}}
+    DB_USER=${DB_USER:-${MYSQL_ENV_MYSQL_USER}}
+    DB_PASS=${DB_PASS:-${MYSQL_ENV_MYSQL_PASSWORD}}
+    DB_ROOT_PASS=${DB_ROOT_PASS:-${MYSQL_ENV_MYSQL_ROOT_PASSWORD}}
+  fi
+
+  if [[ -z ${DB_HOST} ]]; then
+    echo
+    echo "ERROR: "
+    echo "  Please configure the database connection."
+    echo "  Cannot continue without a database. Aborting..."
+    echo
+    return 1
+  fi
+
+  # set default port number if not specified
+  DB_ADAPTER=${DB_ADAPTER:-mysql}
+  case ${DB_ADAPTER} in
+    mysql)
+      DB_ENCODING=${DB_ENCODING:-utf8}
+      DB_PORT=${DB_PORT:-3306}
+      ;;
+    *)
+      echo
+      echo "ERROR: "
+      echo "  Please specify the database type in use via the DB_ADAPTER configuration option."
+      echo "  Accepted value is \"mysql\". Aborting..."
+      echo
+      return 1
+      ;;
+  esac
+
+  # set default user and database
+  DB_USER=${DB_USER:-root}
+  DB_NAME=${CCNET_DB_NAME:-ccnet-db}
+  DB_NAME=${SEAFILE_DB_NAME:-seafile-db}
+  DB_NAME=${SEAHUB_DB_NAME:-seahub-db}
+}
+
+check_database_connection() {
+  case ${DB_ADAPTER} in
+    mysql)
+      prog="mysqladmin -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} status"
+      ;;
+  esac
+  timeout=60
+  while ! ${prog} >/dev/null 2>&1
+  do
+    timeout=$(expr $timeout - 1)
+    if [[ $timeout -eq 0 ]]; then
+      echo
+      echo "Could not connect to database server. Aborting..."
+      return 1
+    fi
+    echo -n "."
+    sleep 1
+  done
+  echo
+}
+
+create_databases() {
+  if mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} -e "USE \`${CCNET_DB_NAME}\`"
+  then
+    return 0
+  fi
+  
+  if [[ -z ${DB_ROOT_PASS} ]]
+  then
+    echo
+    echo "ERROR: "
+    echo "  Seafile databases do not exist and database root password is not set."
+    echo "  Create the databases (${CCNET_DB_NAME}, ${SEAFILE_DB_NAME}, ${SEAHUB_DB_NAME}) or set DB_ROOT_PASS. Aborting..."
+    echo
+    return 1
+  fi
+  
+  for db_name in ${CCNET_DB_NAME} ${SEAFILE_DB_NAME} ${SEAHUB_DB_NAME}
+  do
+    mysqladmin -h ${DB_HOST} -P ${DB_PORT} -u root ${DB_ROOT_PASS:+-p$DB_ROOT_PASS} create ${db_name}
+    mysql -h ${DB_HOST} -P ${DB_PORT} -u root ${DB_ROOT_PASS:+-p$DB_ROOT_PASS} \
+          -e "GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${DB_USER}'@'%';"
+  done
+}
+
+initialize_database() {
+  if mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} ${SEAHUB_DB_NAME} -e "SELECT COUNT(*) FROM django_session"
+  then
+    return 0
+  fi
+  
+  if [[ -z ${SEAFILE_ADMIN_EMAIL} || -z ${SEAFILE_ADMIN_PASS} ]]
+  then
+    echo
+    echo "ERROR: "
+    echo "  Seafile requires an administrator account to be configured."
+    echo "  Please provide SEAFILE_ADMIN_EMAIL and SEAFILE_ADMIN_PASS. Aborting..."
+    echo
+    return 1
+  fi
+  
+  mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} ${SEAHUB_DB_NAME} < ${SEAHUB_SQL}
+  mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} ${CCNET_DB_NAME} < ${CCNET_SQL}
+  
+  password=$(echo -n ${SEAFILE_ADMIN_PASS} | sha1sum | grep -o "[0-9a-f]*")
+  mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} ${DB_PASS:+-p$DB_PASS} ${CCNET_DB_NAME} -e \
+    "REPLACE INTO EmailUser(email, passwd, is_staff, is_active, ctime) VALUES ('${SEAFILE_ADMIN_EMAIL}', '${password}', 1, 1, 0)"
+}
+
+configure_database() {
+  echo -n "Configuring seafile database..."
+
+  finalize_database_parameters
+  check_database_connection
+  create_databases
+  initialize_database
+
+  for config in ${CCNET_CONFIG} ${SEAFDAV_CONFIG} ${SEAFILE_CONFIG} ${SEAHUB_CONFIG}
+  do
+    update_template $config \
+      DB_ADAPTER \
+      DB_ENCODING \
+      DB_HOST \
+      DB_PORT \
+      DB_USER \
+      DB_PASS \
+      CCNET_DB_NAME \
+      SEAFILE_DB_NAME \
+      SEAHUB_DB_NAME
+  done
+}
+
+configure_ccnet() {
+  update_template ${CCNET_CONFIG} \
+    SEAFILE_NAME \
+    CCNET_PEER_ID \
+    SEAFILE_HOST
+}
+
+configure_seafdav() {
+  update_template ${SEAFDAV_CONFIG} \
+    SEAFDAV_ENABLED \
+    SEAFDAV_PORT
+}
+
+configure_seafile() {
+  update_template ${SEAFILE_CONFIG} \
+    SEAFILE_PORT
+}
+
+configure_seahub() {
+  if [[ -z $SEAHUB_SECRET_KEY ]]; then
+    echo "ERROR: "
+    echo "  Please configure the SEAHUB_SECRET_KEY parameter."
+    echo "  Cannot continue. Aborting..."
+    return 1
+  fi
+
+  update_template ${SEAHUB_CONFIG} SEAHUB_SECRET_KEY
+}
+
+configure_gunicorn() {
+  update_template ${GUNICORN_CONFIG} \
+    SEAHUB_PORT
+}
+
+initialize() {
+  echo "Initializing seafile..."
+  initialize_datadir
+  initialize_logdir
+  initialize_ccnet
+  initialize_seahub
+  install_configuration_templates
+}
+
+configure() {
+  echo "Configuring seafile..."
+  configure_database
+  configure_ccnet
+  configure_seafdav
+  configure_seafile
+  configure_seahub
+  configure_gunicorn
+}
