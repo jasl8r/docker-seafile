@@ -79,9 +79,11 @@ initialize_datadir() {
 
 initialize_logdir() {
   echo "Initializing logdir..."
+  mkdir -p ${SEAFILE_LOG_DIR}
   mkdir -p ${SEAFILE_LOG_DIR}/supervisor
-  chmod -R 0755 ${SEAFILE_LOG_DIR}/supervisor
-  chown -R root: ${SEAFILE_LOG_DIR}/supervisor
+  
+  chmod -R 0755 ${SEAFILE_LOG_DIR}
+  chown -R root: ${SEAFILE_LOG_DIR}
 }
 
 initialize_ccnet() {

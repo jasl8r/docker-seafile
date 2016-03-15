@@ -22,7 +22,11 @@ directory=${SEAFILE_HOME}
 environment=
     LD_LIBRARY_PATH="${SEAFILE_INSTALL_DIR}/seafile/lib",
     PATH="${SEAFILE_INSTALL_DIR}/seafile/bin:$PATH"
-command=${SEAFILE_INSTALL_DIR}/seafile/bin/seafile-controller -c ${SEAFILE_ROOT_DATA_DIR}/ccnet -d ${SEAFILE_ROOT_DATA_DIR}/seafile -F ${SEAFILE_HOME}/conf -f
+command=${SEAFILE_INSTALL_DIR}/seafile/bin/seafile-controller -f \
+    -c ${SEAFILE_ROOT_DATA_DIR}/ccnet \
+    -d ${SEAFILE_ROOT_DATA_DIR}/seafile \
+    -F ${SEAFILE_HOME}/conf \
+    -L ${SEAFILE_LOG_DIR}
 autostart=true
 autorestart=true
 stopsignal=QUIT
@@ -41,6 +45,7 @@ environment=
     CCNET_CONF_DIR="${SEAFILE_ROOT_DATA_DIR}/ccnet",
     SEAFILE_CONF_DIR="${SEAFILE_ROOT_DATA_DIR}/seafile",
     SEAFILE_CENTRAL_CONF_DIR="${SEAFILE_HOME}/conf",
+    SEAHUB_LOG_DIR="${SEAFILE_LOG_DIR}",
     PYTHONPATH="${SEAFILE_INSTALL_DIR}/seafile/lib64/python2.6/site-packages:${SEAFILE_INSTALL_DIR}/seahub/thirdpart"
 command=python ${SEAFILE_INSTALL_DIR}/seahub/manage.py run_gunicorn -c ${SEAFILE_HOME}/conf/gunicorn.conf --preload
 autostart=true

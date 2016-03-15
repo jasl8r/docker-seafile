@@ -8,7 +8,7 @@ ENV SEAFILE_ROOT_DATA_DIR="${SEAFILE_HOME}/data" \
     SEAFILE_BUILD_DIR="${SEAFILE_HOME}/build" \
     SEAFILE_RUNTIME_DIR="${SEAFILE_HOME}/runtime" \
     SEAFILE_INSTALL_DIR="${SEAFILE_HOME}/seafile-server-${SEAFILE_VERSION}" \
-    SEAFILE_LOG_DIR="${SEAFILE_HOME}/logs"
+    SEAFILE_LOG_DIR="/var/log/seafile"
 
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y curl gettext-base \
