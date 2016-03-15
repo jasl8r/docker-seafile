@@ -10,6 +10,10 @@ curl -OL https://bintray.com/artifact/download/seafile-org/seafile/seafile-serve
 tar xzf seafile-server_${SEAFILE_VERSION}_x86-64.tar.gz
 rm seafile-server_${SEAFILE_VERSION}_x86-64.tar.gz
 
+cd ${SEAFILE_INSTALL_DIR}/seafile/lib
+rm -f liblber-2.4.so.2 libldap-2.4.so.2 libsasl2.so.2 libldap_r-2.4.so.2
+cd ${SEAFILE_HOME}
+
 # configure supervisord to start seafile
 cat > /etc/supervisor/conf.d/seafile-controller.conf <<EOF
 [program:seafile-controller]

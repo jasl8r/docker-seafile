@@ -10,6 +10,7 @@ SEAFDAV_CONFIG="${SEAFILE_CONF_DIR}/seafdav.conf"
 SEAFILE_CONFIG="${SEAFILE_CONF_DIR}/seafile.conf"
 SEAHUB_CONFIG="${SEAFILE_CONF_DIR}/seahub_settings.py"
 GUNICORN_CONFIG="${SEAFILE_CONF_DIR}/gunicorn.conf"
+LDAP_CONFIG="/etc/ldap/ldap.conf"
 SEAHUB_SQL="${SEAFILE_INSTALL_DIR}/seahub/sql/mysql.sql"
 CCNET_SQL="${SEAFILE_RUNTIME_DIR}/sql/ccnet.sql"
 CCNET_KEY_FILE="${CCNET_DATA_DIR}/mykey.peer"
@@ -312,7 +313,26 @@ configure_smtp() {
     sed -i "/EMAIL_USE_TLS/,/SERVER_EMAIL/d" ${SEAHUB_CONFIG}
   fi
 }
-    
+
+configure_ldap() {
+  if [[ -n ${LDAP_HOST} ]]; then
+    echo "Configuring LDAP..."
+    update_template ${CCNET_CONFIG} \
+      LDAP_BIND_DN \
+      LDAP_PASS \
+      LDAP_HOST \
+      LDAP_BASE \
+      LDAP_UID
+  else
+    sed -i "/[LDAP]/,/LOGIN_ATTR/d" ${CCNET_CONFIG}
+  fi
+  
+  if [[ -n ${LDAP_TLS_REQCERT} ]]; then
+    sed -i "/TLS_REQCERT/d" ${LDAP_CONFIG}
+    echo "TLS_REQCERT ${LDAP_TLS_REQCERT}" >> ${LDAP_CONFIG}
+  fi
+}
+
 initialize() {
   echo "Initializing seafile..."
   initialize_datadir
@@ -331,4 +351,5 @@ configure() {
   configure_seahub
   configure_gunicorn
   configure_smtp
+  configure_ldap
 }
