@@ -14,6 +14,17 @@ cd ${SEAFILE_INSTALL_DIR}/seafile/lib
 rm -f liblber-2.4.so.2 libldap-2.4.so.2 libsasl2.so.2 libldap_r-2.4.so.2
 cd ${SEAFILE_HOME}
 
+mkdir -p ${SEAFILE_HOME}/sockets/
+
+# disable default nginx configuration and enable gitlab's nginx configuration
+rm -rf /etc/nginx/sites-enabled/default
+
+# move nginx logs to ${GITLAB_LOG_DIR}/nginx
+sed -i \
+  -e "s|access_log /var/log/nginx/access.log;|access_log ${SEAFILE_LOG_DIR}/nginx/access.log;|" \
+  -e "s|error_log /var/log/nginx/error.log;|error_log ${SEAFILE_LOG_DIR}/nginx/error.log;|" \
+  /etc/nginx/nginx.conf
+
 # configure supervisord to start seafile
 cat > /etc/supervisor/conf.d/seafile-controller.conf <<EOF
 [program:seafile-controller]
@@ -51,6 +62,19 @@ command=python ${SEAFILE_INSTALL_DIR}/seahub/manage.py run_gunicorn -c ${SEAFILE
 autostart=true
 autorestart=true
 stopsignal=QUIT
+stdout_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
+stderr_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
+EOF
+
+# configure supervisord to start nginx
+cat > /etc/supervisor/conf.d/nginx.conf <<EOF
+[program:nginx]
+priority=20
+directory=/tmp
+command=/usr/sbin/nginx -g "daemon off;"
+user=root
+autostart=true
+autorestart=true
 stdout_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
 stderr_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
 EOF

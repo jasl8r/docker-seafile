@@ -11,8 +11,7 @@ seafile:
   links:
     - mysql:mysql
   ports:
-    - "8000:8000"
-    - "8082:8082"
+    - "80:80"
   environment:
     - SEAFILE_HOST=www.example.com
     - SEAFILE_ADMIN_EMAIL=admin@example.com

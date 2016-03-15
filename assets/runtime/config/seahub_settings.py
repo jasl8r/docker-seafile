@@ -1,5 +1,7 @@
 SECRET_KEY = "{{SEAHUB_SECRET_KEY}}"
 
+FILE_SERVER_ROOT = 'http://{{SEAFILE_HOST}}/seafhttp'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.{{DB_ADAPTER}}',

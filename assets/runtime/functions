@@ -11,6 +11,7 @@ SEAFILE_CONFIG="${SEAFILE_CONF_DIR}/seafile.conf"
 SEAHUB_CONFIG="${SEAFILE_CONF_DIR}/seahub_settings.py"
 GUNICORN_CONFIG="${SEAFILE_CONF_DIR}/gunicorn.conf"
 LDAP_CONFIG="/etc/ldap/ldap.conf"
+NGINX_CONFIG="/etc/nginx/sites-enabled/seafile"
 SEAHUB_SQL="${SEAFILE_INSTALL_DIR}/seahub/sql/mysql.sql"
 CCNET_SQL="${SEAFILE_RUNTIME_DIR}/sql/ccnet.sql"
 CCNET_KEY_FILE="${CCNET_DATA_DIR}/mykey.peer"
@@ -74,12 +75,13 @@ initialize_datadir() {
   # create the seahub data directory
   mkdir -p "${SEAHUB_DATA_DIR}"
   ln -sf ${SEAHUB_DATA_DIR} "${SEAFILE_HOME}/seahub-data"
-  chmod 700 ${SEAHUB_DATA_DIR}
 }
 
 initialize_logdir() {
   echo "Initializing logdir..."
   mkdir -p ${SEAFILE_LOG_DIR}
+  mkdir -p ${SEAFILE_LOG_DIR}/gunicorn
+  mkdir -p ${SEAFILE_LOG_DIR}/nginx
   mkdir -p ${SEAFILE_LOG_DIR}/supervisor
   
   chmod -R 0755 ${SEAFILE_LOG_DIR}
@@ -126,6 +128,7 @@ install_configuration_templates() {
   install_template root: seafile.conf ${SEAFILE_CONFIG} 0640
   install_template root: seahub_settings.py ${SEAHUB_CONFIG} 0640
   install_template root: gunicorn.conf ${GUNICORN_CONFIG} 0640
+  install_template root: nginx/seafile ${NGINX_CONFIG} 0640
 }
 
 finalize_database_parameters() {
@@ -292,12 +295,16 @@ configure_seahub() {
     return 1
   fi
 
-  update_template ${SEAHUB_CONFIG} SEAHUB_SECRET_KEY
+  update_template ${SEAHUB_CONFIG} \
+    SEAFILE_HOST \
+    SEAHUB_SECRET_KEY
 }
 
 configure_gunicorn() {
   update_template ${GUNICORN_CONFIG} \
-    SEAHUB_PORT
+    SEAFILE_HOME \
+    SEAFILE_PID_DIR \
+    SEAFILE_LOG_DIR
 }
 
 configure_smtp() {
@@ -335,6 +342,16 @@ configure_ldap() {
   fi
 }
 
+configure_nginx() {
+  echo "Configuring nginx..."
+  update_template ${NGINX_CONFIG} \
+    SEAFILE_HOME \
+    SEAFILE_HOST \
+    SEAFILE_PORT \
+    SEAFILE_LOG_DIR \
+    SEAFILE_INSTALL_DIR
+}
+
 initialize() {
   echo "Initializing seafile..."
   initialize_datadir
@@ -354,4 +371,5 @@ configure() {
   configure_gunicorn
   configure_smtp
   configure_ldap
+  configure_nginx
 }
