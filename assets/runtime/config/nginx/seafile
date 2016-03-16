@@ -1,0 +1,58 @@
+upstream seahub {
+    server unix:{{SEAFILE_HOME}}/sockets/seahub.socket fail_timeout=0;
+}
+
+upstream seafile {
+    server 127.0.0.1:{{SEAFILE_PORT}} fail_timeout=0;
+}
+
+server {
+    ## Either remove "default_server" from the listen line below,
+    ## or delete the /etc/nginx/sites-enabled/default file. This will cause seafile
+    ## to be served if you visit any address that your server responds to, eg.
+    ## the ip address of the server (http://x.x.x.x/)n 0.0.0.0:80 default_server;
+    listen 0.0.0.0:80 default_server;
+    listen [::]:80 default_server;
+    server_name {{SEAFILE_HOST}}; ## Replace this with something like seafile.example.com
+    server_tokens off; ## Don't show the nginx version number, a security best practice
+
+    ## Individual nginx logs for this seafile vhost
+    access_log  {{SEAFILE_LOG_DIR}}/nginx/seafile_access.log;
+    error_log   {{SEAFILE_LOG_DIR}}/nginx/seafile_error.log;
+
+    location / {
+        gzip off;
+        
+        proxy_read_timeout      300;
+        proxy_connect_timeout   300;
+        proxy_redirect          off;
+
+        proxy_http_version 1.1;
+
+        proxy_set_header    Host                $http_host;
+        proxy_set_header    X-Real-IP           $remote_addr;
+        proxy_set_header    X-Forwarded-For     $proxy_add_x_forwarded_for;
+
+        proxy_pass http://seahub;
+    }
+
+    location /seafhttp {
+        gzip off;
+        
+        rewrite ^/seafhttp(.*)$ $1 break;
+        
+        client_max_body_size 0;
+        
+        proxy_request_buffering off;
+        proxy_connect_timeout  36000s;
+        proxy_read_timeout  36000s;
+        proxy_send_timeout  36000s;
+        send_timeout  36000s;
+        
+        proxy_pass http://seafile;
+    }
+
+    location /media {
+        root {{SEAFILE_INSTALL_DIR}}/seahub;
+    }
+}
