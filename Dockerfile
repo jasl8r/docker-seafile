@@ -15,7 +15,7 @@ RUN apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 8B3981E7A6852F7
  && apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y curl gettext-base nginx \
     mysql-client python2.7 libpython2.7 python-setuptools python-imaging \
-    python-ldap python-mysqldb python-memcache supervisor locales\
+    python-ldap python-mysqldb python-memcache supervisor locales memcached \
  && update-locale LANG=C.UTF-8 LC_MESSAGES=POSIX \
  && locale-gen en_US.UTF-8 \
  && dpkg-reconfigure locales \

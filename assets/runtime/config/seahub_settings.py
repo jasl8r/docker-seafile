@@ -13,6 +13,13 @@ DATABASES = {
     }
 }
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
+    }
+}
+
 EMAIL_USE_TLS = {{SMTP_TLS}}
 EMAIL_HOST = '{{SMTP_HOST}}'
 EMAIL_HOST_USER = '{{SMTP_USER}}'

@@ -78,3 +78,13 @@ autorestart=true
 stdout_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
 stderr_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
 EOF
+
+# configure supervisord to start nginx
+cat > /etc/supervisor/conf.d/memcached.conf <<EOF
+[program:memcached]
+command=/usr/bin/memcached -v -p 11211 -u memcache -c 4096
+autostart=true
+autorestart=true
+stdout_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
+stderr_logfile=${SEAFILE_LOG_DIR}/supervisor/%(program_name)s.log
+EOF
