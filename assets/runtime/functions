@@ -273,6 +273,7 @@ configure_ccnet() {
     SEAFILE_NAME \
     CCNET_PEER_ID \
     SEAFILE_HOST \
+    SEAFILE_SCHEME \
     SEAHUB_PORT
 }
 
@@ -297,6 +298,7 @@ configure_seahub() {
 
   update_template ${SEAHUB_CONFIG} \
     SEAFILE_HOST \
+    SEAFILE_SCHEME \
     SEAHUB_SECRET_KEY
 }
 
