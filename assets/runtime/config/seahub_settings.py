@@ -1,6 +1,6 @@
 SECRET_KEY = "{{SEAHUB_SECRET_KEY}}"
 
-FILE_SERVER_ROOT = 'http://{{SEAFILE_HOST}}/seafhttp'
+FILE_SERVER_ROOT = '{{SEAFILE_SCHEME}}://{{SEAFILE_HOST}}/seafhttp'
 
 DATABASES = {
     'default': {
