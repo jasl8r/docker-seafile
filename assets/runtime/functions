@@ -109,13 +109,14 @@ initialize_seahub() {
   fi
 
   # Setup avatars
-  MEDIA_DIR="${SEAFILE_INSTALL_DIR}/seahub/media"
   SRC_AVATAR_DIR="${SEAFILE_INSTALL_DIR}/seahub/media/avatars"
   DST_AVATAR_DIR="${SEAHUB_DATA_DIR}/avatars"
   if [[ ! -d ${DST_AVATAR_DIR} ]]; then
     mv "${SRC_AVATAR_DIR}" "${DST_AVATAR_DIR}"
-    ln -s ${SEAHUB_DATA_DIR}/avatars ${MEDIA_DIR}
+  else
+    rm -r ${SRC_AVATAR_DIR}
   fi
+  ln -s ${DST_AVATAR_DIR} ${SRC_AVATAR_DIR}
 }
 
 install_configuration_templates() {
